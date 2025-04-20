@@ -19,6 +19,8 @@ contract PresaleDex is Ownable {
     uint256 public maxSellAmount;
     uint256[][3] public phases;
     mapping(address => bool) public isBlacklisted;
+    uint256 startTime;
+    uint256 endTime;
 
     //Constructor
     constructor(
@@ -26,13 +28,20 @@ contract PresaleDex is Ownable {
         address usdcAddress_,
         address fundsManager_,
         uint256 maxSellAmount_,
-        uint256[][3] memory phases_
+        uint256[][3] memory phases_,
+        uint256 startTime_,
+        uint256 endTime_
     ) Ownable(msg.sender) {
         usdcAddress = usdcAddress_;
         usdtAddress = usdtAddress_;
         fundsManager = fundsManager_;
         maxSellAmount = maxSellAmount_;
         phases = phases_;
+        startTime = startTime_;
+        endTime = endTime_;
+
+        require(endTime > startTime,"Incorrect time");
+        require(startTime > block.timestamp,"Presale must be in the future");
     }
 
     //Functions
@@ -59,6 +68,7 @@ contract PresaleDex is Ownable {
      */
     function buyWithStable() external {
         require(!isBlacklisted[msg.sender], "User blacklisted");
+        require(block.timestamp >= startTime,"Presale not started yet");
     }
 
     function emergencyWithdraw(address token_, uint256 amount_) onlyOwner() external{
