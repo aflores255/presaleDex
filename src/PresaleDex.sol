@@ -21,7 +21,12 @@ contract PresaleDex is Ownable {
     mapping(address => bool) public isBlacklisted;
     uint256 startTime;
     uint256 endTime;
+    uint256 tokenSold;
+    mapping(address => uint256) userTokenBalance;
 
+    //Events
+    event TokenBuy(address user, uint256 amount);
+    
     //Constructor
     constructor(
         address usdtAddress_,
@@ -44,6 +49,7 @@ contract PresaleDex is Ownable {
         require(startTime > block.timestamp,"Presale must be in the future");
     }
 
+  
     //Functions
 
     /**
@@ -63,12 +69,31 @@ contract PresaleDex is Ownable {
     }
 
     /**
-     * 
-     * 
+     * Buy tokens with stable coin
+     * @param tokenForBuying_ address of ERC token to buy
+     * @param amount_ amount of tokens for buying
      */
-    function buyWithStable() external {
+    function buyWithStable(address tokenForBuying_, uint256 amount_) external {
         require(!isBlacklisted[msg.sender], "User blacklisted");
         require(block.timestamp >= startTime,"Presale not started yet");
+        require(tokenForBuying_ == usdcAddress ||tokenForBuying_ == usdtAddress, "Incorrect ERC20 Token");
+
+        uint256 tokenAmountToReceive;
+        if (ERC20(tokenForBuying_).decimals() == 18) tokenAmountToReceive = amount_ * 1e6 / phases[currentPhase][1]; // 18 decimals
+        else tokenAmountToReceive = amount_ * 10**(18 - ERC20(tokenForBuying_).decimals()) * 1e6 / phases[currentPhase][1];
+        tokenSold += tokenAmountToReceive;
+
+        require(tokenSold <= maxSellAmount,"Sold Out");
+
+        userTokenBalance[msg.sender] += tokenAmountToReceive;
+
+        IERC20(tokenForBuying_).safeTransferFrom(msg.sender,fundsManager,amount_);
+
+        emit TokenBuy(msg.sender,amount_);
+
+
+
+
     }
 
     function emergencyWithdraw(address token_, uint256 amount_) onlyOwner() external{
