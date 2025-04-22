@@ -23,10 +23,11 @@ contract PresaleDex is Ownable {
     uint256 endTime;
     uint256 tokenSold;
     mapping(address => uint256) userTokenBalance;
+    uint256 public currentPhase;
 
     //Events
     event TokenBuy(address user, uint256 amount);
-    
+
     //Constructor
     constructor(
         address usdtAddress_,
@@ -75,12 +76,14 @@ contract PresaleDex is Ownable {
      */
     function buyWithStable(address tokenForBuying_, uint256 amount_) external {
         require(!isBlacklisted[msg.sender], "User blacklisted");
-        require(block.timestamp >= startTime,"Presale not started yet");
+        require(block.timestamp >= startTime && block.timestamp <= endTime,"Incorrect timestamp to buy");
         require(tokenForBuying_ == usdcAddress ||tokenForBuying_ == usdtAddress, "Incorrect ERC20 Token");
 
         uint256 tokenAmountToReceive;
         if (ERC20(tokenForBuying_).decimals() == 18) tokenAmountToReceive = amount_ * 1e6 / phases[currentPhase][1]; // 18 decimals
         else tokenAmountToReceive = amount_ * 10**(18 - ERC20(tokenForBuying_).decimals()) * 1e6 / phases[currentPhase][1];
+
+        checkCurrentPhase(tokenAmountToReceive);
         tokenSold += tokenAmountToReceive;
 
         require(tokenSold <= maxSellAmount,"Sold Out");
@@ -90,9 +93,6 @@ contract PresaleDex is Ownable {
         IERC20(tokenForBuying_).safeTransferFrom(msg.sender,fundsManager,amount_);
 
         emit TokenBuy(msg.sender,amount_);
-
-
-
 
     }
 
@@ -105,5 +105,21 @@ contract PresaleDex is Ownable {
         uint256 scBalance = address(this).balance;
         (bool success,) = msg.sender.call{value: scBalance}("");
         require(success, "Withdraw failed");
+    }
+
+    function checkCurrentPhase(uint256 amount_) private returns(uint256 phase){
+
+        if(tokenSold + amount_ >= phases[currentPhase][0] || (block.timestamp >= phases[currentPhase][2]) && currentPhase < 3){
+
+            currentPhase++;
+            phase = currentPhase;
+            
+        } else{
+
+            phase = currentPhase;
+        }
+
+
+
     }
 }
