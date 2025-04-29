@@ -7,6 +7,7 @@ pragma solidity 0.8.28;
 import "../lib/openzeppelin-contracts/contracts/access/Ownable.sol";
 import "../lib/openzeppelin-contracts/contracts/token/ERC20/utils/SafeERC20.sol";
 import "../lib/openzeppelin-contracts/contracts/token/ERC20/ERC20.sol";
+import "./interfaces/IAggregator.sol";
 
 // 3. Contract
 
@@ -16,6 +17,7 @@ contract PresaleDex is Ownable {
     address public usdtAddress;
     address public usdcAddress;
     address public fundsManager;
+    address dataFeedAddress;
     uint256 public maxSellAmount;
     uint256[][3] public phases;
     mapping(address => bool) public isBlacklisted;
@@ -32,6 +34,7 @@ contract PresaleDex is Ownable {
     constructor(
         address usdtAddress_,
         address usdcAddress_,
+        address dataFeedAddress_,
         address fundsManager_,
         uint256 maxSellAmount_,
         uint256[][3] memory phases_,
@@ -45,6 +48,7 @@ contract PresaleDex is Ownable {
         phases = phases_;
         startTime = startTime_;
         endTime = endTime_;
+        dataFeedAddress = dataFeedAddress_;
 
         require(endTime > startTime,"Incorrect time");
         require(startTime > block.timestamp,"Presale must be in the future");
@@ -77,7 +81,7 @@ contract PresaleDex is Ownable {
     function buyWithStable(address tokenForBuying_, uint256 amount_) external {
         require(!isBlacklisted[msg.sender], "User blacklisted");
         require(block.timestamp >= startTime && block.timestamp <= endTime,"Incorrect timestamp to buy");
-        require(tokenForBuying_ == usdcAddress ||tokenForBuying_ == usdtAddress, "Incorrect ERC20 Token");
+        require(tokenForBuying_ == usdcAddress || tokenForBuying_ == usdtAddress, "Incorrect ERC20 Token");
 
         uint256 tokenAmountToReceive;
         if (ERC20(tokenForBuying_).decimals() == 18) tokenAmountToReceive = amount_ * 1e6 / phases[currentPhase][1]; // 18 decimals
@@ -92,7 +96,29 @@ contract PresaleDex is Ownable {
 
         IERC20(tokenForBuying_).safeTransferFrom(msg.sender,fundsManager,amount_);
 
-        emit TokenBuy(msg.sender,amount_);
+        emit TokenBuy(msg.sender,tokenAmountToReceive);
+
+    }
+
+    function buyWithEther() external payable{
+        require(!isBlacklisted[msg.sender], "User blacklisted");
+        require(block.timestamp >= startTime && block.timestamp <= endTime,"Incorrect timestamp to buy");
+       
+        uint256 tokenAmountToReceive;
+        checkCurrentPhase(tokenAmountToReceive);
+        tokenSold += tokenAmountToReceive;
+        require(tokenSold <= maxSellAmount,"Sold Out");
+
+        userTokenBalance[msg.sender] += tokenAmountToReceive;
+        emit TokenBuy(msg.sender,tokenAmountToReceive);
+
+    }
+
+    function getEtherPrice() public view returns (int256){
+
+        (,int256 price,,,) = IAggregator(dataFeedAddress).latestRoundData();
+        int256 priceFinal = price * 10**10;
+        return priceFinal;
 
     }
 
