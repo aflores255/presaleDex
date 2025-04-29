@@ -14,6 +14,7 @@ import "./interfaces/IAggregator.sol";
 contract PresaleDex is Ownable {
     using SafeERC20 for IERC20;
     //Variables
+
     address public usdtAddress;
     address public usdcAddress;
     address public fundsManager;
@@ -50,11 +51,10 @@ contract PresaleDex is Ownable {
         endTime = endTime_;
         dataFeedAddress = dataFeedAddress_;
 
-        require(endTime > startTime,"Incorrect time");
-        require(startTime > block.timestamp,"Presale must be in the future");
+        require(endTime > startTime, "Incorrect time");
+        require(startTime > block.timestamp, "Presale must be in the future");
     }
 
-  
     //Functions
 
     /**
@@ -80,72 +80,72 @@ contract PresaleDex is Ownable {
      */
     function buyWithStable(address tokenForBuying_, uint256 amount_) external {
         require(!isBlacklisted[msg.sender], "User blacklisted");
-        require(block.timestamp >= startTime && block.timestamp <= endTime,"Incorrect timestamp to buy");
+        require(block.timestamp >= startTime && block.timestamp <= endTime, "Incorrect timestamp to buy");
         require(tokenForBuying_ == usdcAddress || tokenForBuying_ == usdtAddress, "Incorrect ERC20 Token");
 
         uint256 tokenAmountToReceive;
-        if (ERC20(tokenForBuying_).decimals() == 18) tokenAmountToReceive = amount_ * 1e6 / phases[currentPhase][1]; // 18 decimals
-        else tokenAmountToReceive = amount_ * 10**(18 - ERC20(tokenForBuying_).decimals()) * 1e6 / phases[currentPhase][1];
+        if (ERC20(tokenForBuying_).decimals() == 18) {
+            tokenAmountToReceive = amount_ * 1e6 / phases[currentPhase][1];
+        } // 18 decimals
+        else {
+            tokenAmountToReceive =
+                amount_ * 10 ** (18 - ERC20(tokenForBuying_).decimals()) * 1e6 / phases[currentPhase][1];
+        }
 
         checkCurrentPhase(tokenAmountToReceive);
         tokenSold += tokenAmountToReceive;
 
-        require(tokenSold <= maxSellAmount,"Sold Out");
+        require(tokenSold <= maxSellAmount, "Sold Out");
 
         userTokenBalance[msg.sender] += tokenAmountToReceive;
 
-        IERC20(tokenForBuying_).safeTransferFrom(msg.sender,fundsManager,amount_);
+        IERC20(tokenForBuying_).safeTransferFrom(msg.sender, fundsManager, amount_);
 
-        emit TokenBuy(msg.sender,tokenAmountToReceive);
-
+        emit TokenBuy(msg.sender, tokenAmountToReceive);
     }
 
-    function buyWithEther() external payable{
+    function buyWithEther() external payable {
         require(!isBlacklisted[msg.sender], "User blacklisted");
-        require(block.timestamp >= startTime && block.timestamp <= endTime,"Incorrect timestamp to buy");
-       
+        require(block.timestamp >= startTime && block.timestamp <= endTime, "Incorrect timestamp to buy");
+
         uint256 tokenAmountToReceive;
+        uint256 usdValue = msg.value * getEtherPrice() / 1e18;
+        tokenAmountToReceive = usdValue * 1e6/ phases[currentPhase][1];
         checkCurrentPhase(tokenAmountToReceive);
         tokenSold += tokenAmountToReceive;
-        require(tokenSold <= maxSellAmount,"Sold Out");
+        require(tokenSold <= maxSellAmount, "Sold Out");
 
         userTokenBalance[msg.sender] += tokenAmountToReceive;
-        emit TokenBuy(msg.sender,tokenAmountToReceive);
-
+        (bool success,) = fundsManager.call{value: msg.value}("");
+        require(success, "Payment failed");
+        emit TokenBuy(msg.sender, tokenAmountToReceive);
     }
 
-    function getEtherPrice() public view returns (int256){
-
-        (,int256 price,,,) = IAggregator(dataFeedAddress).latestRoundData();
-        int256 priceFinal = price * 10**10;
-        return priceFinal;
-
+    function getEtherPrice() public view returns (uint256) {
+        (, int256 price,,,) = IAggregator(dataFeedAddress).latestRoundData();
+        price = price * (10 ** 10);
+        return uint256(price);
     }
 
-    function emergencyWithdraw(address token_, uint256 amount_) onlyOwner() external{
-        IERC20(token_).safeTransfer(msg.sender,amount_);
-
+    function emergencyWithdraw(address token_, uint256 amount_) external onlyOwner {
+        IERC20(token_).safeTransfer(msg.sender, amount_);
     }
 
-    function emergyWithdrawEther() onlyOwner() external{
+    function emergyWithdrawEther() external onlyOwner {
         uint256 scBalance = address(this).balance;
         (bool success,) = msg.sender.call{value: scBalance}("");
         require(success, "Withdraw failed");
     }
 
-    function checkCurrentPhase(uint256 amount_) private returns(uint256 phase){
-
-        if(tokenSold + amount_ >= phases[currentPhase][0] || (block.timestamp >= phases[currentPhase][2]) && currentPhase < 3){
-
+    function checkCurrentPhase(uint256 amount_) private returns (uint256 phase) {
+        if (
+            tokenSold + amount_ >= phases[currentPhase][0]
+                || (block.timestamp >= phases[currentPhase][2]) && currentPhase < 3
+        ) {
             currentPhase++;
             phase = currentPhase;
-            
-        } else{
-
+        } else {
             phase = currentPhase;
         }
-
-
-
     }
 }
