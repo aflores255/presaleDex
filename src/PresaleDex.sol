@@ -149,7 +149,7 @@ contract PresaleDex is Ownable {
      * Withdraw ether from SC only for owner
      */
 
-    function emergyWithdrawEther() external onlyOwner {
+    function emergencyWithdrawEther() external onlyOwner {
         uint256 scBalance = address(this).balance;
         (bool success,) = msg.sender.call{value: scBalance}("");
         require(success, "Withdraw failed");

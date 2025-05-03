@@ -240,14 +240,14 @@ contract PresaleDexTest is Test{
     function testEmergencyWithdrawEtherNotOwner() public {
         vm.startPrank(user1);
         vm.expectRevert();
-        presale.emergyWithdrawEther();
+        presale.emergencyWithdrawEther();
         vm.stopPrank();
        
     }
 
     function testEmergencyWithdrawEtherOwner() public {
         vm.startPrank(owner);
-        presale.emergyWithdrawEther();
+        presale.emergencyWithdrawEther();
         vm.stopPrank();  
     }
 
@@ -485,9 +485,37 @@ contract PresaleDexTest is Test{
 
     function testChangePhase() public{
 
+        uint256 amountToBuy = 100*1e6; // 100 usdc
+        uint256 amountToBuy2 = 1000*1e6; // 1000 usdt
+        uint256 balanceUSDCFundsManagerBefore = IERC20(usdcAddress_).balanceOf(fundsManager_);
+        uint256 balanceUSDTFundsManagerBefore = IERC20(usdtAddress_).balanceOf(fundsManager_);
+        vm.startPrank(owner);
+        IERC20(mockToken).approve(address(presale), maxSellAmount_);
+        presale.depositTokens();
+        assert(IERC20(mockToken).balanceOf(address(presale)) == maxSellAmount_);
+        vm.stopPrank();
+        vm.startPrank(user1);
+        vm.warp(block.timestamp + 1 days);
+        IERC20(usdcAddress_).approve(address(presale), amountToBuy);
+        presale.buyWithStable(usdcAddress_, amountToBuy);
+        uint256 calculatedTokensAmount = amountToBuy * 10 ** (18 - ERC20(usdcAddress_).decimals()) * 1e6 / phases_[presale.currentPhase()][1];
+        assert(presale.tokenSold() == calculatedTokensAmount);
+        assert(presale.userTokenBalance(user1) ==  calculatedTokensAmount);
+        assert(IERC20(usdcAddress_).balanceOf(fundsManager_) == amountToBuy + balanceUSDCFundsManagerBefore);
+        vm.startPrank(user2);
+        vm.warp(block.timestamp + 172801); // phase 2
+        IERC20(usdtAddress_).approve(address(presale), amountToBuy2);
+        presale.buyWithStable(usdtAddress_, amountToBuy2);
+        assert(IERC20(usdtAddress_).balanceOf(fundsManager_) == amountToBuy2 + balanceUSDTFundsManagerBefore);
+        assert(presale.currentPhase() == 1);
+        vm.warp(block.timestamp + 345601); // phase 3
+         IERC20(usdtAddress_).approve(address(presale), amountToBuy2);
+        presale.buyWithStable(usdtAddress_, amountToBuy2);
+        assert(presale.currentPhase() == 2);
+
+        vm.stopPrank();
 
 
-        
     }
 
 
