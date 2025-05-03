@@ -9,19 +9,13 @@ import "../src/PresaleDex.sol";
 
 // Mock ERC-20 Token
 
-contract MockToken is ERC20("DexToken","DEX"){
-
-    function mint(address account, uint256 value) external{
-
+contract MockToken is ERC20("DexToken", "DEX") {
+    function mint(address account, uint256 value) external {
         _mint(account, value);
-
     }
-
-
 }
 
-contract PresaleDexTest is Test{
-
+contract PresaleDexTest is Test {
     PresaleDex presale;
     address usdtAddress_ = 0xFd086bC7CD5C481DCC9C85ebE478A1C0b69FCbb9; // USDT Address in Arbitrum One
     address usdcAddress_ = 0xaf88d065e77c8cC2239327C5EDb3A432268e5831; // USDC Address in Arbitrum One
@@ -38,25 +32,30 @@ contract PresaleDexTest is Test{
     uint256 endTime_ = startTime_ + 864000; // 10 days
     MockToken mockToken;
     address presaleTokenAddress_;
-    
 
-
-    function setUp() public{
-
-        phases_[0] = [5000000 * 1e18, 10000, block.timestamp+172800];
-        phases_[1] = [6000000 * 1e18, 15000, block.timestamp+345600];
-        phases_[2] = [10000000 * 1e18, 20000, block.timestamp+518400];
+    function setUp() public {
+        phases_[0] = [5000000 * 1e18, 10000, block.timestamp + 172800];
+        phases_[1] = [6000000 * 1e18, 15000, block.timestamp + 345600];
+        phases_[2] = [10000000 * 1e18, 20000, block.timestamp + 518400];
         mockToken = new MockToken();
         presaleTokenAddress_ = address(mockToken);
-        vm.startPrank(owner);    
-        mockToken.mint(owner, maxSellAmount_);       
-        presale = new PresaleDex(presaleTokenAddress_,usdtAddress_,usdcAddress_,dataFeedAddress_,fundsManager_,maxSellAmount_,phases_,startTime_,endTime_);
+        vm.startPrank(owner);
+        mockToken.mint(owner, maxSellAmount_);
+        presale = new PresaleDex(
+            presaleTokenAddress_,
+            usdtAddress_,
+            usdcAddress_,
+            dataFeedAddress_,
+            fundsManager_,
+            maxSellAmount_,
+            phases_,
+            startTime_,
+            endTime_
+        );
         vm.stopPrank();
-
     }
 
-    function testInitialDeploy() public view{
-
+    function testInitialDeploy() public view {
         assert(presale.currentPhase() == 0);
         assert(presale.presaleTokenAddress() == address(mockToken));
         assert(presale.usdtAddress() == usdtAddress_);
@@ -65,30 +64,44 @@ contract PresaleDexTest is Test{
         assert(presale.fundsManager() == fundsManager_);
         assert(presale.maxSellAmount() == maxSellAmount_);
         assert(presale.tokenSold() == 0);
-
     }
 
     function testIncorrectDates() public {
-
         startTime_ = block.timestamp;
         endTime_ = startTime_ - 1 days;
         vm.expectRevert("Incorrect time");
-        presale = new PresaleDex(presaleTokenAddress_,usdtAddress_,usdcAddress_,dataFeedAddress_,fundsManager_,maxSellAmount_,phases_,startTime_,endTime_);
+        presale = new PresaleDex(
+            presaleTokenAddress_,
+            usdtAddress_,
+            usdcAddress_,
+            dataFeedAddress_,
+            fundsManager_,
+            maxSellAmount_,
+            phases_,
+            startTime_,
+            endTime_
+        );
         endTime_ = startTime_ + 2 days;
         vm.expectRevert("Presale must be in the future");
-        presale = new PresaleDex(presaleTokenAddress_,usdtAddress_,usdcAddress_,dataFeedAddress_,fundsManager_,maxSellAmount_,phases_,startTime_,endTime_);
-
+        presale = new PresaleDex(
+            presaleTokenAddress_,
+            usdtAddress_,
+            usdcAddress_,
+            dataFeedAddress_,
+            fundsManager_,
+            maxSellAmount_,
+            phases_,
+            startTime_,
+            endTime_
+        );
     }
 
-    function testDepositTokens() public{
-
+    function testDepositTokens() public {
         vm.startPrank(owner);
         IERC20(mockToken).approve(address(presale), maxSellAmount_);
         presale.depositTokens();
         assert(IERC20(mockToken).balanceOf(address(presale)) == maxSellAmount_);
         vm.stopPrank();
-
-
     }
 
     function testBlackListUser() public {
@@ -99,7 +112,6 @@ contract PresaleDexTest is Test{
         presale.removeFromBlackList(randomUser1);
         assert(!presale.isBlacklisted(randomUser1));
         vm.stopPrank();
-
     }
 
     function testCannotBlackListUser() public {
@@ -119,8 +131,8 @@ contract PresaleDexTest is Test{
     }
 
     function testBuyWithStable() public {
-        uint256 amountToBuy = 100*1e6; // 100 usdc
-        uint256 amountToBuy2 = 1000*1e6; // 1000 usdt
+        uint256 amountToBuy = 100 * 1e6; // 100 usdc
+        uint256 amountToBuy2 = 1000 * 1e6; // 1000 usdt
         uint256 balanceUSDCFundsManagerBefore = IERC20(usdcAddress_).balanceOf(fundsManager_);
         uint256 balanceUSDTFundsManagerBefore = IERC20(usdtAddress_).balanceOf(fundsManager_);
         vm.startPrank(owner);
@@ -132,25 +144,25 @@ contract PresaleDexTest is Test{
         vm.warp(block.timestamp + 1 days);
         IERC20(usdcAddress_).approve(address(presale), amountToBuy);
         presale.buyWithStable(usdcAddress_, amountToBuy);
-        uint256 calculatedTokensAmount = amountToBuy * 10 ** (18 - ERC20(usdcAddress_).decimals()) * 1e6 / phases_[presale.currentPhase()][1];
+        uint256 calculatedTokensAmount =
+            amountToBuy * 10 ** (18 - ERC20(usdcAddress_).decimals()) * 1e6 / phases_[presale.currentPhase()][1];
         assert(presale.tokenSold() == calculatedTokensAmount);
-        assert(presale.userTokenBalance(user1) ==  calculatedTokensAmount);
+        assert(presale.userTokenBalance(user1) == calculatedTokensAmount);
         assert(IERC20(usdcAddress_).balanceOf(fundsManager_) == amountToBuy + balanceUSDCFundsManagerBefore);
         vm.startPrank(user2);
         IERC20(usdtAddress_).approve(address(presale), amountToBuy2);
         presale.buyWithStable(usdtAddress_, amountToBuy2);
-        uint256 calculatedTokensAmount2 = amountToBuy2 * 10 ** (18 - ERC20(usdtAddress_).decimals()) * 1e6 / phases_[presale.currentPhase()][1];
+        uint256 calculatedTokensAmount2 =
+            amountToBuy2 * 10 ** (18 - ERC20(usdtAddress_).decimals()) * 1e6 / phases_[presale.currentPhase()][1];
         assert(presale.tokenSold() == calculatedTokensAmount + calculatedTokensAmount2);
-        assert(presale.userTokenBalance(user2) ==  calculatedTokensAmount2);
+        assert(presale.userTokenBalance(user2) == calculatedTokensAmount2);
         assert(IERC20(usdtAddress_).balanceOf(fundsManager_) == amountToBuy2 + balanceUSDTFundsManagerBefore);
-        
 
         vm.stopPrank();
-
     }
 
     function testCannotBuyWithStableIfBlacklisted() public {
-        uint256 amountToBuy = 100*1e6; // 100 usdc
+        uint256 amountToBuy = 100 * 1e6; // 100 usdc
         vm.startPrank(owner);
         IERC20(mockToken).approve(address(presale), maxSellAmount_);
         presale.depositTokens();
@@ -166,9 +178,8 @@ contract PresaleDexTest is Test{
         vm.stopPrank();
     }
 
-    
     function testCannotBuyWithStableIncorrectFutureDate() public {
-        uint256 amountToBuy = 100*1e6; // 100 usdc
+        uint256 amountToBuy = 100 * 1e6; // 100 usdc
         vm.startPrank(owner);
         IERC20(mockToken).approve(address(presale), maxSellAmount_);
         presale.depositTokens();
@@ -184,7 +195,7 @@ contract PresaleDexTest is Test{
     }
 
     function testCannotBuyWithStableIncorrectStartDate() public {
-        uint256 amountToBuy = 100*1e6; // 100 usdc
+        uint256 amountToBuy = 100 * 1e6; // 100 usdc
         vm.startPrank(owner);
         IERC20(mockToken).approve(address(presale), maxSellAmount_);
         presale.depositTokens();
@@ -199,7 +210,7 @@ contract PresaleDexTest is Test{
     }
 
     function testCannotBuyWithStableIncorrectToken() public {
-        uint256 amountToBuy = 100*1e18; // 100 DAI
+        uint256 amountToBuy = 100 * 1e18; // 100 DAI
         address daiAddress_ = 0xDA10009cBd5D07dd0CeCc66161FC93D7c9000da1;
         address daiHolder = 0xd9666262234CbAc5b00f949d3D95ef7c7c2191B5;
         vm.startPrank(owner);
@@ -217,15 +228,14 @@ contract PresaleDexTest is Test{
     }
 
     function testCannotBuyWithStableNoTokensDeposited() public {
-        uint256 amountToBuy = 100*1e6; // 100 usdc     
+        uint256 amountToBuy = 100 * 1e6; // 100 usdc
         vm.startPrank(user1);
         vm.warp(block.timestamp + 1 days);
         IERC20(usdcAddress_).approve(address(presale), amountToBuy);
         vm.expectRevert("Contract must have tokens to sell");
-        presale.buyWithStable(usdcAddress_, amountToBuy);    
+        presale.buyWithStable(usdcAddress_, amountToBuy);
 
         vm.stopPrank();
-
     }
 
     function testEmergencyWithdrawNotOwner() public {
@@ -234,7 +244,6 @@ contract PresaleDexTest is Test{
         vm.expectRevert();
         presale.emergencyWithdraw(usdcAddress_, amount_);
         vm.stopPrank();
-       
     }
 
     function testEmergencyWithdrawEtherNotOwner() public {
@@ -242,13 +251,12 @@ contract PresaleDexTest is Test{
         vm.expectRevert();
         presale.emergencyWithdrawEther();
         vm.stopPrank();
-       
     }
 
     function testEmergencyWithdrawEtherOwner() public {
         vm.startPrank(owner);
         presale.emergencyWithdrawEther();
-        vm.stopPrank();  
+        vm.stopPrank();
     }
 
     function testEmergencyWithdrawOwner() public {
@@ -256,28 +264,27 @@ contract PresaleDexTest is Test{
         vm.startPrank(owner);
         IERC20(mockToken).approve(address(presale), maxSellAmount_);
         presale.depositTokens();
-        presale.emergencyWithdraw(address(mockToken),amount_);
+        presale.emergencyWithdraw(address(mockToken), amount_);
         assert(IERC20(mockToken).balanceOf(owner) == amount_);
-        vm.stopPrank();  
+        vm.stopPrank();
     }
 
-    function testGetEtherPrice() public view{
+    function testGetEtherPrice() public view {
         uint256 realPrice = 1800 * 1e18; // Ensure aprox. price feed is ok change if necessary
         uint256 etherPrice = presale.getEtherPrice();
         assert(etherPrice > realPrice);
     }
 
-    function testDepositNoOwner() public{
-    vm.startPrank(user1);
-    mockToken.mint(user1, maxSellAmount_);
-    IERC20(mockToken).approve(address(presale), maxSellAmount_);
-    vm.expectRevert();
-    presale.depositTokens();
-    vm.stopPrank(); 
-
+    function testDepositNoOwner() public {
+        vm.startPrank(user1);
+        mockToken.mint(user1, maxSellAmount_);
+        IERC20(mockToken).approve(address(presale), maxSellAmount_);
+        vm.expectRevert();
+        presale.depositTokens();
+        vm.stopPrank();
     }
 
-     function testBuyWithEther() public {
+    function testBuyWithEther() public {
         uint256 amountToBuy = 10 ether; // 10 ether
         uint256 balanceFundsManagerBefore = fundsManager_.balance;
         vm.startPrank(owner);
@@ -286,14 +293,13 @@ contract PresaleDexTest is Test{
         assert(IERC20(mockToken).balanceOf(address(presale)) == maxSellAmount_);
         vm.stopPrank();
         vm.startPrank(user1);
-        vm.deal(user1,amountToBuy);
+        vm.deal(user1, amountToBuy);
         vm.warp(block.timestamp + 1 days);
         presale.buyWithEther{value: amountToBuy}();
         assert(presale.tokenSold() > 0);
         assert(presale.userTokenBalance(user1) > 0);
-        assert(fundsManager_.balance > balanceFundsManagerBefore);     
+        assert(fundsManager_.balance > balanceFundsManagerBefore);
         vm.stopPrank();
-
     }
 
     function testCannotBuyWithEtherIfBlacklisted() public {
@@ -313,7 +319,6 @@ contract PresaleDexTest is Test{
         vm.stopPrank();
     }
 
-    
     function testCannotBuyWithEtherIncorrectFutureDate() public {
         uint256 amountToBuy = 10 ether; // 10 ether
         vm.startPrank(owner);
@@ -323,7 +328,7 @@ contract PresaleDexTest is Test{
         vm.stopPrank();
 
         vm.startPrank(user1);
-        vm.deal(user1,amountToBuy);
+        vm.deal(user1, amountToBuy);
         vm.warp(block.timestamp + 50 days);
         vm.expectRevert("Incorrect timestamp to buy");
         presale.buyWithEther{value: amountToBuy}();
@@ -339,7 +344,7 @@ contract PresaleDexTest is Test{
         vm.stopPrank();
 
         vm.startPrank(user1);
-        vm.deal(user1,amountToBuy);
+        vm.deal(user1, amountToBuy);
         vm.expectRevert("Incorrect timestamp to buy");
         presale.buyWithEther{value: amountToBuy}();
         vm.stopPrank();
@@ -348,17 +353,15 @@ contract PresaleDexTest is Test{
     function testCannotBuyWithEtherNoTokensDeposited() public {
         uint256 amountToBuy = 10 ether; // 10 ether
         vm.startPrank(user1);
-        vm.deal(user1,amountToBuy);
+        vm.deal(user1, amountToBuy);
         vm.warp(block.timestamp + 1 days);
         vm.expectRevert("Contract must have tokens to sell");
         presale.buyWithEther{value: amountToBuy}();
         vm.stopPrank();
-
     }
 
-    function testClaimTokensIncorrectDate() public{
-
-        uint256 amountToBuy = 100*1e6; // 100 usdc
+    function testClaimTokensIncorrectDate() public {
+        uint256 amountToBuy = 100 * 1e6; // 100 usdc
         uint256 balanceUSDCFundsManagerBefore = IERC20(usdcAddress_).balanceOf(fundsManager_);
         vm.startPrank(owner);
         IERC20(mockToken).approve(address(presale), maxSellAmount_);
@@ -369,20 +372,19 @@ contract PresaleDexTest is Test{
         vm.warp(block.timestamp + 1 days);
         IERC20(usdcAddress_).approve(address(presale), amountToBuy);
         presale.buyWithStable(usdcAddress_, amountToBuy);
-        uint256 calculatedTokensAmount = amountToBuy * 10 ** (18 - ERC20(usdcAddress_).decimals()) * 1e6 / phases_[presale.currentPhase()][1];
+        uint256 calculatedTokensAmount =
+            amountToBuy * 10 ** (18 - ERC20(usdcAddress_).decimals()) * 1e6 / phases_[presale.currentPhase()][1];
         assert(presale.tokenSold() == calculatedTokensAmount);
-        assert(presale.userTokenBalance(user1) ==  calculatedTokensAmount);
+        assert(presale.userTokenBalance(user1) == calculatedTokensAmount);
         assert(IERC20(usdcAddress_).balanceOf(fundsManager_) == amountToBuy + balanceUSDCFundsManagerBefore);
-        
+
         vm.expectRevert("Presale not finished");
         presale.claimTokens();
         vm.stopPrank();
-        
+    }
 
-        }
-
-        function testClaimNoPurchase() public {
-        uint256 amountToBuy = 100*1e6; // 100 usdc
+    function testClaimNoPurchase() public {
+        uint256 amountToBuy = 100 * 1e6; // 100 usdc
         uint256 balanceUSDCFundsManagerBefore = IERC20(usdcAddress_).balanceOf(fundsManager_);
         vm.startPrank(owner);
         IERC20(mockToken).approve(address(presale), maxSellAmount_);
@@ -393,22 +395,22 @@ contract PresaleDexTest is Test{
         vm.warp(block.timestamp + 1 days);
         IERC20(usdcAddress_).approve(address(presale), amountToBuy);
         presale.buyWithStable(usdcAddress_, amountToBuy);
-        uint256 calculatedTokensAmount = amountToBuy * 10 ** (18 - ERC20(usdcAddress_).decimals()) * 1e6 / phases_[presale.currentPhase()][1];
+        uint256 calculatedTokensAmount =
+            amountToBuy * 10 ** (18 - ERC20(usdcAddress_).decimals()) * 1e6 / phases_[presale.currentPhase()][1];
         assert(presale.tokenSold() == calculatedTokensAmount);
-        assert(presale.userTokenBalance(user1) ==  calculatedTokensAmount);
+        assert(presale.userTokenBalance(user1) == calculatedTokensAmount);
         assert(IERC20(usdcAddress_).balanceOf(fundsManager_) == amountToBuy + balanceUSDCFundsManagerBefore);
-        
+
         vm.warp(endTime_ + 1 days);
         vm.stopPrank();
         vm.startPrank(user2);
         vm.expectRevert("No tokens to claim");
         presale.claimTokens();
         vm.stopPrank();
-       
-        }
+    }
 
     function testClaimCorrectly() public {
-        uint256 amountToBuy = 100*1e6; // 100 usdc
+        uint256 amountToBuy = 100 * 1e6; // 100 usdc
         uint256 balanceUSDCFundsManagerBefore = IERC20(usdcAddress_).balanceOf(fundsManager_);
         vm.startPrank(owner);
         IERC20(mockToken).approve(address(presale), maxSellAmount_);
@@ -419,23 +421,23 @@ contract PresaleDexTest is Test{
         vm.warp(block.timestamp + 1 days);
         IERC20(usdcAddress_).approve(address(presale), amountToBuy);
         presale.buyWithStable(usdcAddress_, amountToBuy);
-        uint256 calculatedTokensAmount = amountToBuy * 10 ** (18 - ERC20(usdcAddress_).decimals()) * 1e6 / phases_[presale.currentPhase()][1];
+        uint256 calculatedTokensAmount =
+            amountToBuy * 10 ** (18 - ERC20(usdcAddress_).decimals()) * 1e6 / phases_[presale.currentPhase()][1];
         assert(presale.tokenSold() == calculatedTokensAmount);
-        assert(presale.userTokenBalance(user1) ==  calculatedTokensAmount);
+        assert(presale.userTokenBalance(user1) == calculatedTokensAmount);
         assert(IERC20(usdcAddress_).balanceOf(fundsManager_) == amountToBuy + balanceUSDCFundsManagerBefore);
-        
+
         vm.warp(endTime_ + 1 days);
 
         presale.claimTokens();
         assert(IERC20(mockToken).balanceOf(user1) == calculatedTokensAmount);
 
         vm.stopPrank();
-
     }
 
-     function testSoldOutBuyWithStable() public {
-        uint256 amountToBuy = 500000*1e6; // 500k usdc
-        uint256 amountToBuy2 = 1000*1e6; // 1000 usdt
+    function testSoldOutBuyWithStable() public {
+        uint256 amountToBuy = 500000 * 1e6; // 500k usdc
+        uint256 amountToBuy2 = 1000 * 1e6; // 1000 usdt
         uint256 balanceUSDTFundsManagerBefore = IERC20(usdtAddress_).balanceOf(fundsManager_);
         vm.startPrank(owner);
         IERC20(mockToken).approve(address(presale), maxSellAmount_);
@@ -446,21 +448,21 @@ contract PresaleDexTest is Test{
         vm.startPrank(user2);
         IERC20(usdtAddress_).approve(address(presale), amountToBuy2);
         presale.buyWithStable(usdtAddress_, amountToBuy2);
-        uint256 calculatedTokensAmount2 = amountToBuy2 * 10 ** (18 - ERC20(usdtAddress_).decimals()) * 1e6 / phases_[presale.currentPhase()][1];
+        uint256 calculatedTokensAmount2 =
+            amountToBuy2 * 10 ** (18 - ERC20(usdtAddress_).decimals()) * 1e6 / phases_[presale.currentPhase()][1];
         assert(presale.tokenSold() == calculatedTokensAmount2);
-        assert(presale.userTokenBalance(user2) ==  calculatedTokensAmount2);
+        assert(presale.userTokenBalance(user2) == calculatedTokensAmount2);
         assert(IERC20(usdtAddress_).balanceOf(fundsManager_) == amountToBuy2 + balanceUSDTFundsManagerBefore);
         vm.startPrank(user1);
         IERC20(usdcAddress_).approve(address(presale), amountToBuy);
         vm.expectRevert("Sold Out");
         presale.buyWithStable(usdcAddress_, amountToBuy);
         vm.stopPrank();
-
     }
 
-         function testSoldOutBuyWithEther() public {
-        uint256 amountToBuy = 1000*1e18; // 1000 ether
-        uint256 amountToBuy2 = 1000*1e6; // 1000 usdt
+    function testSoldOutBuyWithEther() public {
+        uint256 amountToBuy = 1000 * 1e18; // 1000 ether
+        uint256 amountToBuy2 = 1000 * 1e6; // 1000 usdt
         uint256 balanceUSDTFundsManagerBefore = IERC20(usdtAddress_).balanceOf(fundsManager_);
         vm.startPrank(owner);
         IERC20(mockToken).approve(address(presale), maxSellAmount_);
@@ -471,22 +473,21 @@ contract PresaleDexTest is Test{
         vm.startPrank(user2);
         IERC20(usdtAddress_).approve(address(presale), amountToBuy2);
         presale.buyWithStable(usdtAddress_, amountToBuy2);
-        uint256 calculatedTokensAmount2 = amountToBuy2 * 10 ** (18 - ERC20(usdtAddress_).decimals()) * 1e6 / phases_[presale.currentPhase()][1];
+        uint256 calculatedTokensAmount2 =
+            amountToBuy2 * 10 ** (18 - ERC20(usdtAddress_).decimals()) * 1e6 / phases_[presale.currentPhase()][1];
         assert(presale.tokenSold() == calculatedTokensAmount2);
-        assert(presale.userTokenBalance(user2) ==  calculatedTokensAmount2);
+        assert(presale.userTokenBalance(user2) == calculatedTokensAmount2);
         assert(IERC20(usdtAddress_).balanceOf(fundsManager_) == amountToBuy2 + balanceUSDTFundsManagerBefore);
         vm.startPrank(user1);
-        vm.deal(user1,amountToBuy);
+        vm.deal(user1, amountToBuy);
         vm.expectRevert("Sold Out");
         presale.buyWithEther{value: amountToBuy}();
         vm.stopPrank();
-
     }
 
-    function testChangePhase() public{
-
-        uint256 amountToBuy = 100*1e6; // 100 usdc
-        uint256 amountToBuy2 = 1000*1e6; // 1000 usdt
+    function testChangePhase() public {
+        uint256 amountToBuy = 100 * 1e6; // 100 usdc
+        uint256 amountToBuy2 = 1000 * 1e6; // 1000 usdt
         uint256 balanceUSDCFundsManagerBefore = IERC20(usdcAddress_).balanceOf(fundsManager_);
         uint256 balanceUSDTFundsManagerBefore = IERC20(usdtAddress_).balanceOf(fundsManager_);
         vm.startPrank(owner);
@@ -498,9 +499,10 @@ contract PresaleDexTest is Test{
         vm.warp(block.timestamp + 1 days);
         IERC20(usdcAddress_).approve(address(presale), amountToBuy);
         presale.buyWithStable(usdcAddress_, amountToBuy);
-        uint256 calculatedTokensAmount = amountToBuy * 10 ** (18 - ERC20(usdcAddress_).decimals()) * 1e6 / phases_[presale.currentPhase()][1];
+        uint256 calculatedTokensAmount =
+            amountToBuy * 10 ** (18 - ERC20(usdcAddress_).decimals()) * 1e6 / phases_[presale.currentPhase()][1];
         assert(presale.tokenSold() == calculatedTokensAmount);
-        assert(presale.userTokenBalance(user1) ==  calculatedTokensAmount);
+        assert(presale.userTokenBalance(user1) == calculatedTokensAmount);
         assert(IERC20(usdcAddress_).balanceOf(fundsManager_) == amountToBuy + balanceUSDCFundsManagerBefore);
         vm.startPrank(user2);
         vm.warp(block.timestamp + 172801); // phase 2
@@ -509,22 +511,10 @@ contract PresaleDexTest is Test{
         assert(IERC20(usdtAddress_).balanceOf(fundsManager_) == amountToBuy2 + balanceUSDTFundsManagerBefore);
         assert(presale.currentPhase() == 1);
         vm.warp(block.timestamp + 345601); // phase 3
-         IERC20(usdtAddress_).approve(address(presale), amountToBuy2);
+        IERC20(usdtAddress_).approve(address(presale), amountToBuy2);
         presale.buyWithStable(usdtAddress_, amountToBuy2);
         assert(presale.currentPhase() == 2);
 
         vm.stopPrank();
-
-
     }
-
-
-
-
-
-
-
-
-
 }
-
