@@ -267,6 +267,234 @@ contract PresaleDexTest is Test{
         assert(etherPrice > realPrice);
     }
 
+    function testDepositNoOwner() public{
+    vm.startPrank(user1);
+    mockToken.mint(user1, maxSellAmount_);
+    IERC20(mockToken).approve(address(presale), maxSellAmount_);
+    vm.expectRevert();
+    presale.depositTokens();
+    vm.stopPrank(); 
+
+    }
+
+     function testBuyWithEther() public {
+        uint256 amountToBuy = 10 ether; // 10 ether
+        uint256 balanceFundsManagerBefore = fundsManager_.balance;
+        vm.startPrank(owner);
+        IERC20(mockToken).approve(address(presale), maxSellAmount_);
+        presale.depositTokens();
+        assert(IERC20(mockToken).balanceOf(address(presale)) == maxSellAmount_);
+        vm.stopPrank();
+        vm.startPrank(user1);
+        vm.deal(user1,amountToBuy);
+        vm.warp(block.timestamp + 1 days);
+        presale.buyWithEther{value: amountToBuy}();
+        assert(presale.tokenSold() > 0);
+        assert(presale.userTokenBalance(user1) > 0);
+        assert(fundsManager_.balance > balanceFundsManagerBefore);     
+        vm.stopPrank();
+
+    }
+
+    function testCannotBuyWithEtherIfBlacklisted() public {
+        uint256 amountToBuy = 10 ether; // 10 ether
+        vm.startPrank(owner);
+        IERC20(mockToken).approve(address(presale), maxSellAmount_);
+        presale.depositTokens();
+        assert(IERC20(mockToken).balanceOf(address(presale)) == maxSellAmount_);
+        presale.blackList(user1);
+        vm.stopPrank();
+
+        vm.startPrank(user1);
+        vm.deal(user1, amountToBuy);
+        vm.warp(block.timestamp + 1 days);
+        vm.expectRevert("User blacklisted");
+        presale.buyWithEther{value: amountToBuy}();
+        vm.stopPrank();
+    }
+
+    
+    function testCannotBuyWithEtherIncorrectFutureDate() public {
+        uint256 amountToBuy = 10 ether; // 10 ether
+        vm.startPrank(owner);
+        IERC20(mockToken).approve(address(presale), maxSellAmount_);
+        presale.depositTokens();
+        assert(IERC20(mockToken).balanceOf(address(presale)) == maxSellAmount_);
+        vm.stopPrank();
+
+        vm.startPrank(user1);
+        vm.deal(user1,amountToBuy);
+        vm.warp(block.timestamp + 50 days);
+        vm.expectRevert("Incorrect timestamp to buy");
+        presale.buyWithEther{value: amountToBuy}();
+        vm.stopPrank();
+    }
+
+    function testCannotBuyWithEtherIncorrectStartDate() public {
+        uint256 amountToBuy = 10 ether; // 10 ether
+        vm.startPrank(owner);
+        IERC20(mockToken).approve(address(presale), maxSellAmount_);
+        presale.depositTokens();
+        assert(IERC20(mockToken).balanceOf(address(presale)) == maxSellAmount_);
+        vm.stopPrank();
+
+        vm.startPrank(user1);
+        vm.deal(user1,amountToBuy);
+        vm.expectRevert("Incorrect timestamp to buy");
+        presale.buyWithEther{value: amountToBuy}();
+        vm.stopPrank();
+    }
+
+    function testCannotBuyWithEtherNoTokensDeposited() public {
+        uint256 amountToBuy = 10 ether; // 10 ether
+        vm.startPrank(user1);
+        vm.deal(user1,amountToBuy);
+        vm.warp(block.timestamp + 1 days);
+        vm.expectRevert("Contract must have tokens to sell");
+        presale.buyWithEther{value: amountToBuy}();
+        vm.stopPrank();
+
+    }
+
+    function testClaimTokensIncorrectDate() public{
+
+        uint256 amountToBuy = 100*1e6; // 100 usdc
+        uint256 balanceUSDCFundsManagerBefore = IERC20(usdcAddress_).balanceOf(fundsManager_);
+        vm.startPrank(owner);
+        IERC20(mockToken).approve(address(presale), maxSellAmount_);
+        presale.depositTokens();
+        assert(IERC20(mockToken).balanceOf(address(presale)) == maxSellAmount_);
+        vm.stopPrank();
+        vm.startPrank(user1);
+        vm.warp(block.timestamp + 1 days);
+        IERC20(usdcAddress_).approve(address(presale), amountToBuy);
+        presale.buyWithStable(usdcAddress_, amountToBuy);
+        uint256 calculatedTokensAmount = amountToBuy * 10 ** (18 - ERC20(usdcAddress_).decimals()) * 1e6 / phases_[presale.currentPhase()][1];
+        assert(presale.tokenSold() == calculatedTokensAmount);
+        assert(presale.userTokenBalance(user1) ==  calculatedTokensAmount);
+        assert(IERC20(usdcAddress_).balanceOf(fundsManager_) == amountToBuy + balanceUSDCFundsManagerBefore);
+        
+        vm.expectRevert("Presale not finished");
+        presale.claimTokens();
+        vm.stopPrank();
+        
+
+        }
+
+        function testClaimNoPurchase() public {
+        uint256 amountToBuy = 100*1e6; // 100 usdc
+        uint256 balanceUSDCFundsManagerBefore = IERC20(usdcAddress_).balanceOf(fundsManager_);
+        vm.startPrank(owner);
+        IERC20(mockToken).approve(address(presale), maxSellAmount_);
+        presale.depositTokens();
+        assert(IERC20(mockToken).balanceOf(address(presale)) == maxSellAmount_);
+        vm.stopPrank();
+        vm.startPrank(user1);
+        vm.warp(block.timestamp + 1 days);
+        IERC20(usdcAddress_).approve(address(presale), amountToBuy);
+        presale.buyWithStable(usdcAddress_, amountToBuy);
+        uint256 calculatedTokensAmount = amountToBuy * 10 ** (18 - ERC20(usdcAddress_).decimals()) * 1e6 / phases_[presale.currentPhase()][1];
+        assert(presale.tokenSold() == calculatedTokensAmount);
+        assert(presale.userTokenBalance(user1) ==  calculatedTokensAmount);
+        assert(IERC20(usdcAddress_).balanceOf(fundsManager_) == amountToBuy + balanceUSDCFundsManagerBefore);
+        
+        vm.warp(endTime_ + 1 days);
+        vm.stopPrank();
+        vm.startPrank(user2);
+        vm.expectRevert("No tokens to claim");
+        presale.claimTokens();
+        vm.stopPrank();
+       
+        }
+
+    function testClaimCorrectly() public {
+        uint256 amountToBuy = 100*1e6; // 100 usdc
+        uint256 balanceUSDCFundsManagerBefore = IERC20(usdcAddress_).balanceOf(fundsManager_);
+        vm.startPrank(owner);
+        IERC20(mockToken).approve(address(presale), maxSellAmount_);
+        presale.depositTokens();
+        assert(IERC20(mockToken).balanceOf(address(presale)) == maxSellAmount_);
+        vm.stopPrank();
+        vm.startPrank(user1);
+        vm.warp(block.timestamp + 1 days);
+        IERC20(usdcAddress_).approve(address(presale), amountToBuy);
+        presale.buyWithStable(usdcAddress_, amountToBuy);
+        uint256 calculatedTokensAmount = amountToBuy * 10 ** (18 - ERC20(usdcAddress_).decimals()) * 1e6 / phases_[presale.currentPhase()][1];
+        assert(presale.tokenSold() == calculatedTokensAmount);
+        assert(presale.userTokenBalance(user1) ==  calculatedTokensAmount);
+        assert(IERC20(usdcAddress_).balanceOf(fundsManager_) == amountToBuy + balanceUSDCFundsManagerBefore);
+        
+        vm.warp(endTime_ + 1 days);
+
+        presale.claimTokens();
+        assert(IERC20(mockToken).balanceOf(user1) == calculatedTokensAmount);
+
+        vm.stopPrank();
+
+    }
+
+     function testSoldOutBuyWithStable() public {
+        uint256 amountToBuy = 500000*1e6; // 500k usdc
+        uint256 amountToBuy2 = 1000*1e6; // 1000 usdt
+        uint256 balanceUSDTFundsManagerBefore = IERC20(usdtAddress_).balanceOf(fundsManager_);
+        vm.startPrank(owner);
+        IERC20(mockToken).approve(address(presale), maxSellAmount_);
+        presale.depositTokens();
+        assert(IERC20(mockToken).balanceOf(address(presale)) == maxSellAmount_);
+        vm.stopPrank();
+        vm.warp(block.timestamp + 1 days);
+        vm.startPrank(user2);
+        IERC20(usdtAddress_).approve(address(presale), amountToBuy2);
+        presale.buyWithStable(usdtAddress_, amountToBuy2);
+        uint256 calculatedTokensAmount2 = amountToBuy2 * 10 ** (18 - ERC20(usdtAddress_).decimals()) * 1e6 / phases_[presale.currentPhase()][1];
+        assert(presale.tokenSold() == calculatedTokensAmount2);
+        assert(presale.userTokenBalance(user2) ==  calculatedTokensAmount2);
+        assert(IERC20(usdtAddress_).balanceOf(fundsManager_) == amountToBuy2 + balanceUSDTFundsManagerBefore);
+        vm.startPrank(user1);
+        IERC20(usdcAddress_).approve(address(presale), amountToBuy);
+        vm.expectRevert("Sold Out");
+        presale.buyWithStable(usdcAddress_, amountToBuy);
+        vm.stopPrank();
+
+    }
+
+         function testSoldOutBuyWithEther() public {
+        uint256 amountToBuy = 1000*1e18; // 1000 ether
+        uint256 amountToBuy2 = 1000*1e6; // 1000 usdt
+        uint256 balanceUSDTFundsManagerBefore = IERC20(usdtAddress_).balanceOf(fundsManager_);
+        vm.startPrank(owner);
+        IERC20(mockToken).approve(address(presale), maxSellAmount_);
+        presale.depositTokens();
+        assert(IERC20(mockToken).balanceOf(address(presale)) == maxSellAmount_);
+        vm.stopPrank();
+        vm.warp(block.timestamp + 1 days);
+        vm.startPrank(user2);
+        IERC20(usdtAddress_).approve(address(presale), amountToBuy2);
+        presale.buyWithStable(usdtAddress_, amountToBuy2);
+        uint256 calculatedTokensAmount2 = amountToBuy2 * 10 ** (18 - ERC20(usdtAddress_).decimals()) * 1e6 / phases_[presale.currentPhase()][1];
+        assert(presale.tokenSold() == calculatedTokensAmount2);
+        assert(presale.userTokenBalance(user2) ==  calculatedTokensAmount2);
+        assert(IERC20(usdtAddress_).balanceOf(fundsManager_) == amountToBuy2 + balanceUSDTFundsManagerBefore);
+        vm.startPrank(user1);
+        vm.deal(user1,amountToBuy);
+        vm.expectRevert("Sold Out");
+        presale.buyWithEther{value: amountToBuy}();
+        vm.stopPrank();
+
+    }
+
+    function testChangePhase() public{
+
+
+
+        
+    }
+
+
+
+
+
+
 
 
 

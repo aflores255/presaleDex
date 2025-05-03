@@ -57,8 +57,6 @@ contract PresaleDex is Ownable {
 
         require(endTime > startTime, "Incorrect time");
         require(startTime > block.timestamp, "Presale must be in the future");
-       
-    
     }
 
     //Functions
@@ -88,12 +86,14 @@ contract PresaleDex is Ownable {
         require(!isBlacklisted[msg.sender], "User blacklisted");
         require(block.timestamp >= startTime && block.timestamp <= endTime, "Incorrect timestamp to buy");
         require(tokenForBuying_ == usdcAddress || tokenForBuying_ == usdtAddress, "Incorrect ERC20 Token");
-        require(IERC20(presaleTokenAddress).balanceOf(address(this)) == maxSellAmount,"Contract must have tokens to sell");
+        require(
+            IERC20(presaleTokenAddress).balanceOf(address(this)) == maxSellAmount, "Contract must have tokens to sell"
+        );
 
         uint256 tokenAmountToReceive;
 
         tokenAmountToReceive = amount_ * 10 ** (18 - ERC20(tokenForBuying_).decimals()) * 1e6 / phases[currentPhase][1];
-        
+
         checkCurrentPhase(tokenAmountToReceive);
         tokenSold += tokenAmountToReceive;
 
@@ -112,7 +112,9 @@ contract PresaleDex is Ownable {
     function buyWithEther() external payable {
         require(!isBlacklisted[msg.sender], "User blacklisted");
         require(block.timestamp >= startTime && block.timestamp <= endTime, "Incorrect timestamp to buy");
-        require(IERC20(presaleTokenAddress).balanceOf(address(this)) == maxSellAmount,"Contract must have tokens to sell");
+        require(
+            IERC20(presaleTokenAddress).balanceOf(address(this)) == maxSellAmount, "Contract must have tokens to sell"
+        );
         uint256 tokenAmountToReceive;
         uint256 usdValue = msg.value * getEtherPrice() / 1e18;
         tokenAmountToReceive = usdValue * 1e6 / phases[currentPhase][1];
@@ -158,6 +160,7 @@ contract PresaleDex is Ownable {
      */
     function claimTokens() external {
         require(block.timestamp > endTime, "Presale not finished");
+        require(userTokenBalance[msg.sender] > 0, "No tokens to claim");
 
         uint256 userAmount = userTokenBalance[msg.sender];
         delete userTokenBalance[msg.sender];
@@ -167,7 +170,8 @@ contract PresaleDex is Ownable {
     /**
      * Deposit Tokens to presale
      */
-    function depositTokens() onlyOwner() external {
+
+    function depositTokens() external onlyOwner {
         IERC20(presaleTokenAddress).safeTransferFrom(msg.sender, address(this), maxSellAmount);
         emit DepositTokens(maxSellAmount);
     }
@@ -176,7 +180,6 @@ contract PresaleDex is Ownable {
      * Get current phase of the presale
      * @param amount_ amount of tokens sold
      */
-
     function checkCurrentPhase(uint256 amount_) private returns (uint256 phase) {
         if (
             tokenSold + amount_ >= phases[currentPhase][0]
@@ -188,6 +191,4 @@ contract PresaleDex is Ownable {
             phase = currentPhase;
         }
     }
-
-
 }
