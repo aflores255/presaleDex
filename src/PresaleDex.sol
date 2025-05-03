@@ -15,22 +15,23 @@ contract PresaleDex is Ownable {
     using SafeERC20 for IERC20;
     //Variables
 
-    address presaleTokenAddress;
+    address public presaleTokenAddress;
     address public usdtAddress;
     address public usdcAddress;
     address public fundsManager;
-    address dataFeedAddress;
+    address public dataFeedAddress;
     uint256 public maxSellAmount;
     uint256[][3] public phases;
     mapping(address => bool) public isBlacklisted;
     uint256 startTime;
     uint256 endTime;
-    uint256 tokenSold;
-    mapping(address => uint256) userTokenBalance;
+    uint256 public tokenSold;
+    mapping(address => uint256) public userTokenBalance;
     uint256 public currentPhase;
 
     //Events
     event TokenBuy(address user, uint256 amount);
+    event DepositTokens(uint256 amount);
 
     //Constructor
     constructor(
@@ -56,7 +57,8 @@ contract PresaleDex is Ownable {
 
         require(endTime > startTime, "Incorrect time");
         require(startTime > block.timestamp, "Presale must be in the future");
-        IERC20(presaleTokenAddress).safeTransferFrom(msg.sender, address(this), maxSellAmount);
+       
+    
     }
 
     //Functions
@@ -86,16 +88,12 @@ contract PresaleDex is Ownable {
         require(!isBlacklisted[msg.sender], "User blacklisted");
         require(block.timestamp >= startTime && block.timestamp <= endTime, "Incorrect timestamp to buy");
         require(tokenForBuying_ == usdcAddress || tokenForBuying_ == usdtAddress, "Incorrect ERC20 Token");
+        require(IERC20(presaleTokenAddress).balanceOf(address(this)) == maxSellAmount,"Contract must have tokens to sell");
 
         uint256 tokenAmountToReceive;
-        if (ERC20(tokenForBuying_).decimals() == 18) {
-            tokenAmountToReceive = amount_ * 1e6 / phases[currentPhase][1];
-        } // 18 decimals
-        else {
-            tokenAmountToReceive =
-                amount_ * 10 ** (18 - ERC20(tokenForBuying_).decimals()) * 1e6 / phases[currentPhase][1];
-        }
 
+        tokenAmountToReceive = amount_ * 10 ** (18 - ERC20(tokenForBuying_).decimals()) * 1e6 / phases[currentPhase][1];
+        
         checkCurrentPhase(tokenAmountToReceive);
         tokenSold += tokenAmountToReceive;
 
@@ -114,7 +112,7 @@ contract PresaleDex is Ownable {
     function buyWithEther() external payable {
         require(!isBlacklisted[msg.sender], "User blacklisted");
         require(block.timestamp >= startTime && block.timestamp <= endTime, "Incorrect timestamp to buy");
-
+        require(IERC20(presaleTokenAddress).balanceOf(address(this)) == maxSellAmount,"Contract must have tokens to sell");
         uint256 tokenAmountToReceive;
         uint256 usdValue = msg.value * getEtherPrice() / 1e18;
         tokenAmountToReceive = usdValue * 1e6 / phases[currentPhase][1];
@@ -167,6 +165,14 @@ contract PresaleDex is Ownable {
         IERC20(presaleTokenAddress).safeTransfer(msg.sender, userAmount);
     }
     /**
+     * Deposit Tokens to presale
+     */
+    function depositTokens() onlyOwner() external {
+        IERC20(presaleTokenAddress).safeTransferFrom(msg.sender, address(this), maxSellAmount);
+        emit DepositTokens(maxSellAmount);
+    }
+
+    /**
      * Get current phase of the presale
      * @param amount_ amount of tokens sold
      */
@@ -182,4 +188,6 @@ contract PresaleDex is Ownable {
             phase = currentPhase;
         }
     }
+
+
 }
